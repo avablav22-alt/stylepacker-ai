@@ -360,28 +360,30 @@ function OutfitSection({
 }) {
   const isDaytime = timeOfDay === 'daytime';
 
-  // Organize pieces by category
+  // Organize pieces by category — use includes() to match both singular and plural forms
   const mainPieces = outfit.pieces?.filter((p) => {
     const cat = (p.category || '').toLowerCase();
-    return ['top', 'bottom', 'dress'].includes(cat);
+    return cat.includes('top') || cat.includes('bottom') || cat.includes('dress');
   }) || [];
 
   const shoesPieces = outfit.pieces?.filter((p) => {
     const cat = (p.category || '').toLowerCase();
-    return cat.includes('shoe') || cat.includes('boot') || cat.includes('sneaker');
+    return cat.includes('shoe') || cat.includes('boot') || cat.includes('sneaker') || cat.includes('sandal') || cat.includes('loafer') || cat.includes('pump') || cat.includes('heel');
   }) || [];
 
   const outerwearPieces = outfit.pieces?.filter((p) => {
     const cat = (p.category || '').toLowerCase();
-    return ['jacket', 'coat', 'cardigan', 'sweater', 'blazer'].includes(cat);
+    return cat.includes('outerwear') || cat.includes('layer') || cat.includes('jacket') || cat.includes('coat') || cat.includes('cardigan') || cat.includes('sweater') || cat.includes('blazer');
   }) || [];
 
   const accessoryPieces = outfit.pieces?.filter((p) => {
     const cat = (p.category || '').toLowerCase();
-    return ['bag', 'accessory', 'jewelry', 'sunglasses', 'scarf', 'hat', 'belt'].some((ac) =>
-      cat.includes(ac)
-    );
+    return cat.includes('bag') || cat.includes('accessor') || cat.includes('jewelry') || cat.includes('sunglasses') || cat.includes('scarf') || cat.includes('hat') || cat.includes('belt');
   }) || [];
+
+  // Catch any pieces that didn't match the above categories
+  const categorizedIds = new Set([...mainPieces, ...shoesPieces, ...outerwearPieces, ...accessoryPieces].map(p => p.id));
+  const uncategorizedPieces = outfit.pieces?.filter((p) => !categorizedIds.has(p.id)) || [];
 
   return (
     <div className={`mb-10 rounded-2xl border ${isDaytime ? 'border-gray-100 bg-white' : 'border-purple-100 bg-gradient-to-br from-white to-purple-50'} overflow-hidden`}>
@@ -415,12 +417,12 @@ function OutfitSection({
 
       {/* Pieces Grid */}
       <div className="px-6 sm:px-8 py-8">
-        {/* Main Pieces */}
-        {mainPieces.length > 0 && (
+        {/* Main Pieces (tops, bottoms, dresses + any uncategorized) */}
+        {(mainPieces.length > 0 || uncategorizedPieces.length > 0) && (
           <div className="mb-10">
             <h4 className="text-sm uppercase tracking-widest font-bold text-gray-400 mb-4">Core Pieces</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {mainPieces.map((piece, i) => (
+              {[...mainPieces, ...uncategorizedPieces].map((piece, i) => (
                 <PieceCard
                   key={piece.id || i}
                   piece={piece}
@@ -548,13 +550,17 @@ function PieceCard({
           }}
         >
           <span>
-            {piece.category === 'shoe' || piece.category?.includes('boot')
+            {(piece.category || '').toLowerCase().includes('shoe') || (piece.category || '').toLowerCase().includes('boot') || (piece.category || '').toLowerCase().includes('sandal')
               ? '👟'
-              : piece.category === 'bag'
+              : (piece.category || '').toLowerCase().includes('bag')
                 ? '👜'
-                : piece.category?.includes('jewelry')
+                : (piece.category || '').toLowerCase().includes('jewelry')
                   ? '✨'
-                  : '👕'}
+                  : (piece.category || '').toLowerCase().includes('accessor')
+                    ? '🕶️'
+                    : (piece.category || '').toLowerCase().includes('outerwear') || (piece.category || '').toLowerCase().includes('layer')
+                      ? '🧥'
+                      : '👕'}
           </span>
         </div>
 

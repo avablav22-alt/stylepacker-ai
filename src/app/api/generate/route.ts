@@ -124,9 +124,13 @@ const generateMockCapsule = (
   weather?: WeatherData,
   itinerary?: string
 ): CapsuleResponse => {
-  const totalDays = Math.max(1, Math.ceil(
-    (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-      (1000 * 60 * 60 * 24)
+  // Parse dates safely — append T00:00:00 to avoid timezone offset issues
+  const sdParts = startDate.split('-').map(Number);
+  const edParts = endDate.split('-').map(Number);
+  const sdDate = new Date(sdParts[0], sdParts[1] - 1, sdParts[2]);
+  const edDate = new Date(edParts[0], edParts[1] - 1, edParts[2]);
+  const totalDays = Math.max(1, Math.round(
+    (edDate.getTime() - sdDate.getTime()) / (1000 * 60 * 60 * 24)
   ) + 1);
 
   // Parse itinerary into day descriptions with venues
@@ -139,9 +143,42 @@ const generateMockCapsule = (
   }[] = [];
 
   if (itinerary) {
-    const dayMatches = itinerary.split(/day\s*\d+\s*[:\-]/i);
-    dayMatches.filter(d => d.trim()).forEach((dayText, idx) => {
+    // Try multiple parsing strategies:
+    // 1. Split by "Day X:" / "Day X -" pattern
+    // 2. Split by newlines if no day markers found
+    // 3. Split by numbered lines (1. / 1) / 1:)
+
+    let rawDayTexts: string[] = [];
+
+    // Strategy 1: "Day 1:", "Day 1 -", "Day 1 –"
+    const dayMarkerSplit = itinerary.split(/day\s*\d+\s*[:\-–]/i);
+    const dayMarkerTexts = dayMarkerSplit.filter(d => d.trim());
+
+    if (dayMarkerTexts.length > 0) {
+      rawDayTexts = dayMarkerTexts;
+    } else {
+      // Strategy 2: Numbered lines "1.", "1)", "1:"
+      const numberedSplit = itinerary.split(/(?:^|\n)\s*\d+\s*[.):\-]/);
+      const numberedTexts = numberedSplit.filter(d => d.trim());
+
+      if (numberedTexts.length > 1) {
+        rawDayTexts = numberedTexts;
+      } else {
+        // Strategy 3: Split by newlines
+        const lineSplit = itinerary.split(/\n+/).filter(l => l.trim());
+        if (lineSplit.length > 0) {
+          rawDayTexts = lineSplit;
+        } else {
+          // Single blob of text — treat as one day
+          rawDayTexts = [itinerary.trim()];
+        }
+      }
+    }
+
+    rawDayTexts.forEach((dayText) => {
       const text = dayText.trim();
+      if (!text) return;
+
       const hasEvening = /dinner|cocktail|night|evening|club|bar|rooftop|lounge/i.test(text);
 
       // Extract venue name if mentioned
@@ -156,10 +193,12 @@ const generateMockCapsule = (
       if (/nightclub|club|party|lounge/i.test(text)) dressCode = 'Dressy/Edgy';
       if (/hiking|adventure|outdoor|nature/i.test(text)) dressCode = 'Active Wear';
 
-      const firstActivity = text.split(/[,.]/).map(s => s.trim()).filter(Boolean)[0] || text;
+      // Use the actual user text as the title (clean up leading punctuation/whitespace)
+      const cleanedTitle = text.replace(/^[\s,.\-–:]+/, '').trim();
+      const firstActivity = cleanedTitle.split(/[,.]/).map(s => s.trim()).filter(Boolean)[0] || cleanedTitle;
       itineraryDays.push({
-        title: firstActivity.length > 50 ? firstActivity.slice(0, 50) + '...' : firstActivity,
-        summary: text.length > 150 ? text.slice(0, 150) + '...' : text,
+        title: firstActivity.length > 60 ? firstActivity.slice(0, 60) + '...' : firstActivity,
+        summary: cleanedTitle.length > 200 ? cleanedTitle.slice(0, 200) + '...' : cleanedTitle,
         hasEvening,
         venue,
         dressCode,
@@ -573,9 +612,9 @@ const generateMockCapsule = (
   let allPieces: ClothingPiece[] = [];
 
   for (let i = 1; i <= Math.min(totalDays, 5); i++) {
-    const currentDate = new Date(startDate);
+    const currentDate = new Date(sdDate.getTime());
     currentDate.setDate(currentDate.getDate() + i - 1);
-    const dateStr = currentDate.toISOString().split('T')[0];
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
 
     const itDay = itineraryDays[i - 1];
     const hasEvening = itDay?.hasEvening ?? (i <= 2);
@@ -725,10 +764,12 @@ export async function POST(request: Request) {
         itinerary
       );
 
-      const rawDays = Math.ceil(
-        (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-          (1000 * 60 * 60 * 24)
-      );
+      // Parse dates safely — use local date parts to avoid timezone issues
+      const sdP = startDate.split('-').map(Number);
+      const edP = endDate.split('-').map(Number);
+      const sdD = new Date(sdP[0], sdP[1] - 1, sdP[2]);
+      const edD = new Date(edP[0], edP[1] - 1, edP[2]);
+      const rawDays = Math.round((edD.getTime() - sdD.getTime()) / (1000 * 60 * 60 * 24));
       const totalDays = isNaN(rawDays) ? 3 : Math.max(1, rawDays + 1);
 
       return NextResponse.json({
@@ -749,11 +790,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // Calculate total days
-    const rawTotalDays = Math.ceil(
-      (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-        (1000 * 60 * 60 * 24)
-    );
+    // Calculate total days — parse dates safely to avoid timezone issues
+    const sdParts2 = startDate.split('-').map(Number);
+    const edParts2 = endDate.split('-').map(Number);
+    const sdDate2 = new Date(sdParts2[0], sdParts2[1] - 1, sdParts2[2]);
+    const edDate2 = new Date(edParts2[0], edParts2[1] - 1, edParts2[2]);
+    const rawTotalDays = Math.round((edDate2.getTime() - sdDate2.getTime()) / (1000 * 60 * 60 * 24));
     const totalDays = isNaN(rawTotalDays) ? 3 : Math.max(1, rawTotalDays + 1);
 
     // Build content blocks for Claude
@@ -1041,9 +1083,15 @@ Return ONLY a valid JSON object matching this EXACT structure (note: all fields 
     console.error('Error in generate route:', error);
 
     // Last resort: return a minimal valid response so the app doesn't crash
-    const fallbackTotalDays = Math.max(1, Math.ceil(
-      (new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1) || 3;
+    let fallbackTotalDays = 3;
+    try {
+      const fbSd = startDate.split('-').map(Number);
+      const fbEd = endDate.split('-').map(Number);
+      const fbSdD = new Date(fbSd[0], fbSd[1] - 1, fbSd[2]);
+      const fbEdD = new Date(fbEd[0], fbEd[1] - 1, fbEd[2]);
+      const fbRaw = Math.round((fbEdD.getTime() - fbSdD.getTime()) / (1000 * 60 * 60 * 24));
+      if (!isNaN(fbRaw)) fallbackTotalDays = Math.max(1, fbRaw + 1);
+    } catch { /* keep default 3 */ }
 
     const fallback = generateMockCapsule(
       destination || 'Your Destination',
