@@ -31,10 +31,15 @@ export interface OutfitPiece {
   name: string;
   brand: string;
   price: string;
+  priceNum?: number;
   color: string;
   colorHex: string;
-  category: 'tops' | 'bottoms' | 'shoes' | 'accessories' | 'dresses' | 'layers';
+  category: string;
+  material?: string;
   shopUrl: string;
+  imageUrl?: string;
+  isReused?: boolean;
+  reusedDays?: number[];
 }
 
 export interface DayOutfit {
@@ -42,6 +47,16 @@ export interface DayOutfit {
   pieces: OutfitPiece[];
   colorPalette: string[];
   styleNote: string;
+  totalPrice?: number;
+}
+
+export interface DayWeather {
+  temp: number;
+  tempHigh: number;
+  tempLow: number;
+  conditions: string;
+  rainChance: number;
+  recommendation: string;
 }
 
 export interface DayPlan {
@@ -51,6 +66,8 @@ export interface DayPlan {
   activitySummary: string;
   daytimeOutfit: DayOutfit;
   eveningOutfit?: DayOutfit;
+  weather?: DayWeather;
+  dayTotal?: number;
 }
 
 export interface WeatherData {
@@ -60,6 +77,15 @@ export interface WeatherData {
   description: string;
   icon: string;
   humidity: number;
+  rainChance?: number;
+}
+
+export interface CapsuleAnalysis {
+  totalUniquePieces: number;
+  totalOutfits: number;
+  reusedPieces: { pieceId: string; pieceName: string; usedInDays: number[] }[];
+  packingEfficiency: string;
+  fitsInCarryOn: boolean;
 }
 
 export interface TripResults {
@@ -74,6 +100,9 @@ export interface TripResults {
   blendInTips: string;
   mixMatchTips: string[];
   dontForgetItems: string[];
+  tripTotal?: number;
+  capsuleAnalysis?: CapsuleAnalysis;
+  streetStyleSearchUrl?: string;
 }
 
 export interface AppState {
@@ -115,16 +144,16 @@ export const BUDGET_INFO: Record<BudgetTier, { label: string; range: string; bra
   '$': {
     label: 'Budget',
     range: 'Under $50/piece',
-    brands: 'H&M, Zara, ASOS, Uniqlo',
+    brands: 'Zara, H&M, ASOS, Mango, Uniqlo, COS',
   },
   '$$': {
     label: 'Mid-range',
     range: '$50-150/piece',
-    brands: '& Other Stories, COS, Reformation, Mango',
+    brands: 'Reformation, Sezane, Reiss, Ganni, Anine Bing',
   },
   '$$$': {
     label: 'Splurge',
     range: '$150+/piece',
-    brands: 'Sezane, Toteme, The Row, Aritzia',
+    brands: 'The Row, Toteme, Khaite, Jacquemus, Max Mara',
   },
 };

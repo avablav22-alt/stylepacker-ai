@@ -1,10 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { OutfitPiece } from '@/types';
 
 export default function PackingChecklist() {
   const { results, packedItems, togglePackedItem, setCurrentPage } = useApp();
+  const [ownedItems, setOwnedItems] = useState<Set<string>>(new Set());
+
+  const toggleOwnedItem = (id: string) => {
+    setOwnedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (!results) {
     return (
@@ -31,20 +42,68 @@ export default function PackingChecklist() {
     }
   });
 
+  // Calculate budget (excluding owned items)
+  const budgetItems = Array.from(allPieces.values()).filter(
+    (piece) => !ownedItems.has(piece.id) && piece.priceNum
+  );
+  const totalBudget = budgetItems.reduce((sum, piece) => sum + (piece.priceNum || 0), 0);
+  const budgetFormatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(totalBudget);
+
+  // Organize accessories into subsections
+  const getAccessorySubcategory = (piece: OutfitPiece): string => {
+    const name = piece.name.toLowerCase();
+    if (name.includes('bag') || name.includes('purse') || name.includes('backpack')) return 'bags';
+    if (
+      name.includes('necklace') ||
+      name.includes('bracelet') ||
+      name.includes('earring') ||
+      name.includes('ring')
+    )
+      return 'jewelry';
+    if (name.includes('hat') || name.includes('cap')) return 'hats';
+    if (name.includes('scarf')) return 'scarves';
+    return 'other';
+  };
+
   // Group pieces by category
   const categories = [
     { key: 'tops', label: 'Tops & Layers', categoryNames: ['tops', 'layers'] },
     { key: 'bottoms', label: 'Bottoms & Dresses', categoryNames: ['bottoms', 'dresses'] },
     { key: 'shoes', label: 'Shoes', categoryNames: ['shoes'] },
-    { key: 'accessories', label: 'Bags & Accessories', categoryNames: ['accessories'] },
+    { key: 'accessories', label: 'Accessories', categoryNames: ['accessories'] },
   ];
 
-  const groupedPieces = categories.map((cat) => ({
-    ...cat,
-    items: Array.from(allPieces.values()).filter((piece) =>
+  const groupedPieces = categories.map((cat) => {
+    const items = Array.from(allPieces.values()).filter((piece) =>
       cat.categoryNames.includes(piece.category)
-    ),
-  }));
+    );
+
+    if (cat.key === 'accessories') {
+      // Further subdivide accessories
+      const accessorySubs = [
+        { subkey: 'bags', sublabel: 'Bags' },
+        { subkey: 'jewelry', sublabel: 'Jewelry' },
+        { subkey: 'hats', sublabel: 'Hats' },
+        { subkey: 'scarves', sublabel: 'Scarves' },
+        { subkey: 'other', sublabel: 'Other' },
+      ];
+      const subgrouped = accessorySubs
+        .map((sub) => ({
+          ...sub,
+          subitems: items.filter((piece) => getAccessorySubcategory(piece) === sub.subkey),
+        }))
+        .filter((sub) => sub.subitems.length > 0);
+
+      return { ...cat, items, accessorySubs: subgrouped };
+    }
+
+    return { ...cat, items };
+  });
 
   const totalItems = allPieces.size;
   const packedCount = packedItems.size;
@@ -52,6 +111,7 @@ export default function PackingChecklist() {
 
   const dontForgetItems = results.dontForgetItems || [];
   const mixMatchTips = results.mixMatchTips || [];
+  const capsuleAnalysis = results.capsuleAnalysis || '';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 py-8 px-4">
@@ -71,6 +131,17 @@ export default function PackingChecklist() {
             Back
           </button>
         </div>
+
+        {/* Budget Summary */}
+        {totalBudget > 0 && (
+          <div className="bg-gradient-to-r from-[#534AB7] to-[#7c5cdb] rounded-lg p-6 mb-8 text-white">
+            <p className="text-sm font-medium opacity-90">Total new items</p>
+            <p className="text-3xl font-bold">{budgetFormatted}</p>
+            <p className="text-xs mt-2 opacity-75">
+              {budgetItems.length} item{budgetItems.length !== 1 ? 's' : ''} to purchase
+            </p>
+          </div>
+        )}
 
         {/* Progress Section */}
         <div className="bg-white rounded-lg border border-gray-100 p-6 mb-8">
@@ -93,6 +164,27 @@ export default function PackingChecklist() {
           </p>
         </div>
 
+        {/* Capsule Analysis */}
+        {capsuleAnalysis && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+              </svg>
+              Capsule Wardrobe Analysis
+            </h3>
+            <p className="text-sm text-blue-800 leading-relaxed font-medium">{capsuleAnalysis.packingEfficiency}</p>
+            {capsuleAnalysis.fitsInCarryOn && <p className="text-sm text-green-700 mt-1 font-semibold">🧳 Fits in a carry-on!</p>}
+            {capsuleAnalysis.reusedPieces?.length > 0 && (
+              <div className="mt-3 text-xs text-blue-700">
+                {capsuleAnalysis.reusedPieces.slice(0, 5).map((rp, i) => (
+                  <p key={i}><span className="font-medium">{rp.pieceName}</span> — Day {rp.usedInDays.join(', ')}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Checklist Sections */}
         <div className="space-y-6">
           {groupedPieces.map((category) =>
@@ -105,66 +197,43 @@ export default function PackingChecklist() {
                   </h3>
                 </div>
 
-                {/* Items */}
-                <div className="divide-y divide-gray-100">
-                  {category.items.map((piece) => {
-                    const isPacked = packedItems.has(piece.id);
-                    return (
-                      <div
-                        key={piece.id}
-                        className={`flex items-center gap-4 px-6 py-4 transition-all duration-200 ${
-                          isPacked
-                            ? 'bg-gray-50 opacity-60'
-                            : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => togglePackedItem(piece.id)}
-                          className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                            isPacked
-                              ? 'bg-[#534AB7] border-[#534AB7]'
-                              : 'border-gray-300 hover:border-[#534AB7]'
-                          }`}
-                        >
-                          {isPacked && (
-                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Color Swatch */}
-                        <div
-                          className="flex-shrink-0 w-8 h-8 rounded-full border border-gray-200 shadow-sm"
-                          style={{ backgroundColor: piece.colorHex }}
-                          title={piece.color}
-                        />
-
-                        {/* Item Info */}
-                        <div className="flex-grow min-w-0">
-                          <p
-                            className={`font-medium transition-all ${
-                              isPacked
-                                ? 'text-gray-600 line-through'
-                                : 'text-gray-900'
-                            }`}
-                          >
-                            {piece.name}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {piece.brand}
+                {/* Accessor Subsections */}
+                {category.key === 'accessories' && 'accessorySubs' in category ? (
+                  <div className="divide-y divide-gray-100">
+                    {(category as any).accessorySubs.map((subcat: any) => (
+                      <div key={subcat.subkey}>
+                        <div className="bg-gray-100 px-6 py-2 border-b border-gray-100">
+                          <p className="text-xs font-semibold text-gray-600 uppercase">
+                            {subcat.sublabel}
                           </p>
                         </div>
-
-                        {/* Price Indicator */}
-                        <div className="flex-shrink-0 text-right">
-                          <p className="text-xs text-gray-600">{piece.price}</p>
-                        </div>
+                        {subcat.subitems.map((piece: OutfitPiece) => (
+                          <PieceItem
+                            key={piece.id}
+                            piece={piece}
+                            isPacked={packedItems.has(piece.id)}
+                            isOwned={ownedItems.has(piece.id)}
+                            togglePackedItem={togglePackedItem}
+                            toggleOwnedItem={toggleOwnedItem}
+                          />
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {category.items.map((piece) => (
+                      <PieceItem
+                        key={piece.id}
+                        piece={piece}
+                        isPacked={packedItems.has(piece.id)}
+                        isOwned={ownedItems.has(piece.id)}
+                        togglePackedItem={togglePackedItem}
+                        toggleOwnedItem={toggleOwnedItem}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null
           )}
@@ -232,6 +301,118 @@ export default function PackingChecklist() {
               : `${totalItems - packedCount} items left to pack`}
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper component for rendering individual pieces
+function PieceItem({
+  piece,
+  isPacked,
+  isOwned,
+  togglePackedItem,
+  toggleOwnedItem,
+}: {
+  piece: OutfitPiece;
+  isPacked: boolean;
+  isOwned: boolean;
+  togglePackedItem: (id: string) => void;
+  toggleOwnedItem: (id: string) => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-4 px-6 py-4 transition-all duration-200 ${
+        isPacked ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'
+      }`}
+    >
+      {/* Packing Checkbox */}
+      <button
+        onClick={() => togglePackedItem(piece.id)}
+        className={`flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+          isPacked
+            ? 'bg-[#534AB7] border-[#534AB7]'
+            : 'border-gray-300 hover:border-[#534AB7]'
+        }`}
+      >
+        {isPacked && (
+          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        )}
+      </button>
+
+      {/* Image or Color Swatch */}
+      {piece.imageUrl ? (
+        <img
+          src={piece.imageUrl}
+          alt={piece.name}
+          className="flex-shrink-0 w-10 h-10 rounded object-cover border border-gray-200 shadow-sm"
+        />
+      ) : (
+        <div
+          className="flex-shrink-0 w-10 h-10 rounded-full border border-gray-200 shadow-sm"
+          style={{ backgroundColor: piece.colorHex }}
+          title={piece.color}
+        />
+      )}
+
+      {/* Item Info */}
+      <div className="flex-grow min-w-0">
+        <div className="flex items-start gap-2 flex-wrap">
+          <p
+            className={`font-medium transition-all ${
+              isPacked
+                ? 'text-gray-600 line-through'
+                : 'text-gray-900'
+            }`}
+          >
+            {piece.name}
+          </p>
+          {piece.isReused && piece.reusedDays && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+              Reused {piece.reusedDays}x
+            </span>
+          )}
+          {piece.material && (
+            <span className="text-xs text-gray-500">
+              {piece.material}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-gray-500">
+          {piece.brand}
+        </p>
+      </div>
+
+      {/* Price & Status */}
+      <div className="flex-shrink-0 text-right flex items-center gap-3">
+        {piece.priceNum && (
+          <p
+            className={`text-sm font-medium ${
+              isOwned ? 'text-gray-400 line-through' : 'text-gray-900'
+            }`}
+          >
+            ${piece.priceNum}
+          </p>
+        )}
+
+        {/* Already Own Toggle */}
+        <button
+          onClick={() => toggleOwnedItem(piece.id)}
+          className={`flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-all ${
+            isOwned
+              ? 'bg-green-600 border-green-600'
+              : 'border-gray-300 hover:border-green-600'
+          }`}
+          title="Mark as already owned"
+        >
+          {isOwned && (
+            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+        </button>
       </div>
     </div>
   );
