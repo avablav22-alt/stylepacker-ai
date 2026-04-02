@@ -1,8 +1,98 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { DayPlan, DayOutfit, OutfitPiece } from '@/types';
+
+// ─── Category Classifier ───
+// Maps ANY category string (from API or mock) into a display group
+function classifyPiece(piece: OutfitPiece): 'tops' | 'bottoms' | 'dresses' | 'outerwear' | 'shoes' | 'bags' | 'accessories' {
+  const cat = (piece.category || '').toLowerCase();
+  const name = (piece.name || '').toLowerCase();
+
+  // Check category field first, then fall back to item name
+  // TOPS
+  if (
+    cat === 'tops' || cat === 'top' ||
+    cat.includes('blouse') || cat.includes('shirt') || cat.includes('tee') ||
+    cat.includes('tank') || cat.includes('cami') || cat.includes('polo') ||
+    cat.includes('henley') || cat.includes('bodysuit') ||
+    name.includes('blouse') || name.includes('shirt') || name.includes('tank') ||
+    name.includes('tee') || name.includes('cami') || name.includes('polo') ||
+    name.includes('henley') || name.includes('bodysuit') || name.includes('crop top')
+  ) return 'tops';
+
+  // BOTTOMS
+  if (
+    cat === 'bottoms' || cat === 'bottom' ||
+    cat.includes('pant') || cat.includes('jean') || cat.includes('trouser') ||
+    cat.includes('skirt') || cat.includes('short') || cat.includes('legging') ||
+    cat.includes('chino') || cat.includes('cargo') ||
+    name.includes('pants') || name.includes('jeans') || name.includes('trousers') ||
+    name.includes('skirt') || name.includes('shorts') || name.includes('leggings') ||
+    name.includes('chinos') || name.includes('cargo')
+  ) return 'bottoms';
+
+  // DRESSES / JUMPSUITS
+  if (
+    cat === 'dresses' || cat === 'dress' ||
+    cat.includes('jumpsuit') || cat.includes('romper') || cat.includes('playsuit') ||
+    name.includes('dress') || name.includes('jumpsuit') || name.includes('romper') ||
+    name.includes('gown') || name.includes('maxi') || name.includes('midi dress')
+  ) return 'dresses';
+
+  // SHOES
+  if (
+    cat === 'shoes' || cat === 'shoe' || cat === 'footwear' ||
+    cat.includes('shoe') || cat.includes('boot') || cat.includes('sneaker') ||
+    cat.includes('sandal') || cat.includes('loafer') || cat.includes('pump') ||
+    cat.includes('heel') || cat.includes('flat') || cat.includes('mule') ||
+    cat.includes('espadrille') || cat.includes('flip') || cat.includes('slipper') ||
+    name.includes('shoe') || name.includes('boot') || name.includes('sneaker') ||
+    name.includes('sandal') || name.includes('loafer') || name.includes('pump') ||
+    name.includes('heel') || name.includes('flat') || name.includes('mule') ||
+    name.includes('espadrille') || name.includes('flip flop')
+  ) return 'shoes';
+
+  // OUTERWEAR / LAYERS
+  if (
+    cat === 'outerwear' || cat === 'layers' || cat === 'layer' ||
+    cat.includes('jacket') || cat.includes('coat') || cat.includes('blazer') ||
+    cat.includes('cardigan') || cat.includes('sweater') || cat.includes('hoodie') ||
+    cat.includes('vest') || cat.includes('poncho') || cat.includes('cape') ||
+    cat.includes('parka') || cat.includes('trench') || cat.includes('windbreaker') ||
+    cat.includes('pullover') || cat.includes('outerwear') || cat.includes('layer') ||
+    name.includes('jacket') || name.includes('coat') || name.includes('blazer') ||
+    name.includes('cardigan') || name.includes('sweater') || name.includes('hoodie') ||
+    name.includes('vest') || name.includes('poncho') || name.includes('trench') ||
+    name.includes('parka') || name.includes('pullover') || name.includes('windbreaker')
+  ) return 'outerwear';
+
+  // BAGS
+  if (
+    cat === 'bags' || cat === 'bag' ||
+    cat.includes('bag') || cat.includes('purse') || cat.includes('clutch') ||
+    cat.includes('tote') || cat.includes('backpack') || cat.includes('crossbody') ||
+    cat.includes('satchel') || cat.includes('handbag') ||
+    name.includes('bag') || name.includes('purse') || name.includes('clutch') ||
+    name.includes('tote') || name.includes('backpack') || name.includes('crossbody') ||
+    name.includes('satchel') || name.includes('handbag')
+  ) return 'bags';
+
+  // ACCESSORIES (catch-all for jewelry, scarves, hats, belts, sunglasses, watches, etc.)
+  return 'accessories';
+}
+
+// Display config for each group
+const CATEGORY_CONFIG: Record<string, { label: string; emoji: string; order: number; cardSize: 'small' | 'medium' | 'large' }> = {
+  tops:        { label: 'Tops',              emoji: '👕', order: 1, cardSize: 'large' },
+  bottoms:     { label: 'Bottoms',           emoji: '👖', order: 2, cardSize: 'large' },
+  dresses:     { label: 'Dresses & Jumpsuits', emoji: '👗', order: 3, cardSize: 'large' },
+  outerwear:   { label: 'Outerwear & Layers', emoji: '🧥', order: 4, cardSize: 'medium' },
+  shoes:       { label: 'Shoes',             emoji: '👟', order: 5, cardSize: 'medium' },
+  bags:        { label: 'Bags',              emoji: '👜', order: 6, cardSize: 'medium' },
+  accessories: { label: 'Accessories',       emoji: '✨', order: 7, cardSize: 'small' },
+};
 
 export default function Results() {
   const { results, setCurrentPage, premium } = useApp();
@@ -28,7 +118,6 @@ export default function Results() {
   const { destination, startDate, endDate, totalDays, weather, days } = results;
   const selectedDay = days[selectedDayIndex];
 
-  // Calculate price totals
   const getTotalPieces = (): number => {
     const pieceIds = new Set<string>();
     days.forEach((day) => {
@@ -150,13 +239,11 @@ export default function Results() {
       {/* Header */}
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 lg:py-12">
-          {/* Destination Title */}
           <div className="mb-8">
             <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 mb-3">{destination}</h1>
             <p className="text-gray-500 text-lg">{formatDate(startDate)} – {formatDate(endDate)} · {totalDays} days</p>
           </div>
 
-          {/* Capsule Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-8">
             <div>
               <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Duration</p>
@@ -176,31 +263,18 @@ export default function Results() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button
-              onClick={() => setCurrentPage(7)}
-              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors"
-            >
+            <button onClick={() => setCurrentPage(7)} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors">
               📅 Calendar
             </button>
-            <button
-              onClick={() => setCurrentPage(8)}
-              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors"
-            >
+            <button onClick={() => setCurrentPage(8)} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors">
               ✓ Packing List
             </button>
-            <button
-              onClick={() => setCurrentPage(9)}
-              className="px-4 py-2 border border-[#534AB7] rounded-lg text-sm text-[#534AB7] font-medium hover:bg-[#534AB7] hover:text-white transition-colors flex items-center gap-1.5"
-            >
+            <button onClick={() => setCurrentPage(9)} className="px-4 py-2 border border-[#534AB7] rounded-lg text-sm text-[#534AB7] font-medium hover:bg-[#534AB7] hover:text-white transition-colors flex items-center gap-1.5">
               👀 Local Style
               {premium && <span className="bg-[#534AB7] text-white text-xs px-2 py-0.5 rounded-full">PRO</span>}
             </button>
-            <button
-              onClick={handleExportPDF}
-              className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors"
-            >
+            <button onClick={handleExportPDF} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors">
               📥 Export PDF
             </button>
           </div>
@@ -232,13 +306,11 @@ export default function Results() {
       {selectedDay && (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
           <div className="animate-fade-in">
-            {/* Day Header */}
             <div className="mb-8">
               <h2 className="text-4xl font-bold text-gray-900 mb-2">{selectedDay.title}</h2>
               <p className="text-lg text-gray-600">{selectedDay.activitySummary}</p>
             </div>
 
-            {/* Weather Banner */}
             <WeatherBanner
               description={weather?.description || 'Clear'}
               tempHigh={weather?.temp || 72}
@@ -248,7 +320,6 @@ export default function Results() {
               recommendation={getWeatherRecommendation(weather?.description || '')}
             />
 
-            {/* Daytime Outfit */}
             {selectedDay.daytimeOutfit && (
               <OutfitSection
                 outfit={selectedDay.daytimeOutfit}
@@ -262,7 +333,6 @@ export default function Results() {
               />
             )}
 
-            {/* Evening Outfit */}
             {selectedDay.eveningOutfit && (
               <OutfitSection
                 outfit={selectedDay.eveningOutfit}
@@ -276,7 +346,6 @@ export default function Results() {
               />
             )}
 
-            {/* Day Total */}
             <div className="mt-8 p-6 bg-gradient-to-r from-[#534AB7]/5 to-[#534AB7]/10 rounded-xl border border-[#534AB7]/20">
               <div className="flex justify-between items-center">
                 <span className="text-lg font-semibold text-gray-700">Day Total</span>
@@ -290,10 +359,7 @@ export default function Results() {
       {/* Footer */}
       <div className="border-t border-gray-100 mt-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex justify-between items-center">
-          <button
-            onClick={() => setCurrentPage(1)}
-            className="text-sm text-gray-500 hover:text-gray-800 transition-colors font-medium"
-          >
+          <button onClick={() => setCurrentPage(1)} className="text-sm text-gray-500 hover:text-gray-800 transition-colors font-medium">
             ← Start Over
           </button>
           <span className="text-xs text-gray-400">StylePacker AI</span>
@@ -338,7 +404,7 @@ function WeatherBanner({
   );
 }
 
-/* ─── Outfit Section ─── */
+/* ─── Outfit Section (REWRITTEN: dynamic grouping, no pieces lost) ─── */
 function OutfitSection({
   outfit,
   timeOfDay,
@@ -359,31 +425,19 @@ function OutfitSection({
   onShopAll: () => void;
 }) {
   const isDaytime = timeOfDay === 'daytime';
+  const pieces = outfit.pieces || [];
 
-  // Organize pieces by category — use includes() to match both singular and plural forms
-  const mainPieces = outfit.pieces?.filter((p) => {
-    const cat = (p.category || '').toLowerCase();
-    return cat.includes('top') || cat.includes('bottom') || cat.includes('dress');
-  }) || [];
+  // Group ALL pieces by classified category — nothing gets lost
+  const grouped: Record<string, OutfitPiece[]> = {};
+  pieces.forEach((piece) => {
+    const group = classifyPiece(piece);
+    if (!grouped[group]) grouped[group] = [];
+    grouped[group].push(piece);
+  });
 
-  const shoesPieces = outfit.pieces?.filter((p) => {
-    const cat = (p.category || '').toLowerCase();
-    return cat.includes('shoe') || cat.includes('boot') || cat.includes('sneaker') || cat.includes('sandal') || cat.includes('loafer') || cat.includes('pump') || cat.includes('heel');
-  }) || [];
-
-  const outerwearPieces = outfit.pieces?.filter((p) => {
-    const cat = (p.category || '').toLowerCase();
-    return cat.includes('outerwear') || cat.includes('layer') || cat.includes('jacket') || cat.includes('coat') || cat.includes('cardigan') || cat.includes('sweater') || cat.includes('blazer');
-  }) || [];
-
-  const accessoryPieces = outfit.pieces?.filter((p) => {
-    const cat = (p.category || '').toLowerCase();
-    return cat.includes('bag') || cat.includes('accessor') || cat.includes('jewelry') || cat.includes('sunglasses') || cat.includes('scarf') || cat.includes('hat') || cat.includes('belt');
-  }) || [];
-
-  // Catch any pieces that didn't match the above categories
-  const categorizedIds = new Set([...mainPieces, ...shoesPieces, ...outerwearPieces, ...accessoryPieces].map(p => p.id));
-  const uncategorizedPieces = outfit.pieces?.filter((p) => !categorizedIds.has(p.id)) || [];
+  // Sort groups by display order
+  const sortedGroups = Object.entries(grouped)
+    .sort(([a], [b]) => (CATEGORY_CONFIG[a]?.order ?? 99) - (CATEGORY_CONFIG[b]?.order ?? 99));
 
   return (
     <div className={`mb-10 rounded-2xl border ${isDaytime ? 'border-gray-100 bg-white' : 'border-purple-100 bg-gradient-to-br from-white to-purple-50'} overflow-hidden`}>
@@ -401,9 +455,9 @@ function OutfitSection({
         </div>
 
         {/* Color Palette */}
-        {outfit.pieces && outfit.pieces.length > 0 && (
+        {pieces.length > 0 && (
           <div className="flex gap-2 mt-4 flex-wrap">
-            {[...new Set(outfit.pieces.map((p) => p.colorHex).filter(Boolean))].map((color, i) => (
+            {[...new Set(pieces.map((p) => p.colorHex).filter(Boolean))].map((color, i) => (
               <div
                 key={i}
                 className="w-8 h-8 rounded-full border-2 border-white shadow-md"
@@ -415,82 +469,51 @@ function OutfitSection({
         )}
       </div>
 
-      {/* Pieces Grid */}
+      {/* Pieces — dynamically grouped, EVERY piece renders */}
       <div className="px-6 sm:px-8 py-8">
-        {/* Main Pieces (tops, bottoms, dresses + any uncategorized) */}
-        {(mainPieces.length > 0 || uncategorizedPieces.length > 0) && (
-          <div className="mb-10">
-            <h4 className="text-sm uppercase tracking-widest font-bold text-gray-400 mb-4">Core Pieces</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[...mainPieces, ...uncategorizedPieces].map((piece, i) => (
-                <PieceCard
-                  key={piece.id || i}
-                  piece={piece}
-                  isOwned={ownedPieces.has(piece.id)}
-                  toggleOwned={toggleOwned}
-                  size="large"
-                />
-              ))}
+        {sortedGroups.map(([groupKey, groupPieces]) => {
+          const config = CATEGORY_CONFIG[groupKey] || { label: groupKey, emoji: '🏷️', order: 99, cardSize: 'medium' as const };
+          const isSmall = config.cardSize === 'small';
+          return (
+            <div key={groupKey} className="mb-10 last:mb-0">
+              <h4 className="text-sm uppercase tracking-widest font-bold text-gray-400 mb-4">
+                {config.emoji} {config.label}
+              </h4>
+              <div className={`grid gap-5 ${
+                isSmall
+                  ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              }`}>
+                {groupPieces.map((piece, i) => (
+                  <PieceCard
+                    key={piece.id || `${groupKey}-${i}`}
+                    piece={piece}
+                    isOwned={ownedPieces.has(piece.id)}
+                    toggleOwned={toggleOwned}
+                    size={config.cardSize}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })}
 
-        {/* Shoes & Outerwear */}
-        {(shoesPieces.length > 0 || outerwearPieces.length > 0) && (
-          <div className="mb-10">
-            <h4 className="text-sm uppercase tracking-widest font-bold text-gray-400 mb-4">Shoes & Layers</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[...shoesPieces, ...outerwearPieces].map((piece, i) => (
-                <PieceCard
-                  key={piece.id || i}
-                  piece={piece}
-                  isOwned={ownedPieces.has(piece.id)}
-                  toggleOwned={toggleOwned}
-                  size="medium"
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Accessories */}
-        {accessoryPieces.length > 0 && (
-          <div className="mb-8">
-            <h4 className="text-sm uppercase tracking-widest font-bold text-gray-400 mb-4">Accessories</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {accessoryPieces.map((piece, i) => (
-                <PieceCard
-                  key={piece.id || i}
-                  piece={piece}
-                  isOwned={ownedPieces.has(piece.id)}
-                  toggleOwned={toggleOwned}
-                  size="small"
-                />
-              ))}
-            </div>
-          </div>
+        {/* Fallback: if no pieces at all, show a message */}
+        {pieces.length === 0 && (
+          <p className="text-gray-400 text-center py-8">No pieces generated for this look</p>
         )}
       </div>
 
       {/* Outfit Actions */}
       <div className={`px-6 sm:px-8 py-6 flex flex-wrap gap-3 border-t ${isDaytime ? 'border-gray-100 bg-white' : 'border-purple-100 bg-purple-50'}`}>
-        <button
-          onClick={onSwap}
-          className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors"
-        >
+        <button onClick={onSwap} className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors">
           🔄 Swap this look
         </button>
-        <button
-          onClick={onAdjust}
-          className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors"
-        >
+        <button onClick={onAdjust} className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 font-medium hover:border-[#534AB7] hover:text-[#534AB7] transition-colors">
           🎨 Adjust style
         </button>
-        <button
-          onClick={onShopAll}
-          className="px-4 py-2.5 bg-[#534AB7] text-white text-sm rounded-lg font-medium hover:bg-[#3E369A] transition-colors ml-auto"
-        >
-          🛒 Shop All ({outfit.pieces?.length || 0})
+        <button onClick={onShopAll} className="px-4 py-2.5 bg-[#534AB7] text-white text-sm rounded-lg font-medium hover:bg-[#3E369A] transition-colors ml-auto">
+          🛒 Shop All ({pieces.length})
         </button>
       </div>
     </div>
@@ -518,6 +541,8 @@ function PieceCard({
 
   const price = parsePrice(piece.priceNum || piece.price);
   const displayPrice = isOwned ? 'Owned' : `$${price.toFixed(0)}`;
+  const group = classifyPiece(piece);
+  const config = CATEGORY_CONFIG[group];
 
   const sizeClasses = {
     small: 'h-24',
@@ -537,11 +562,14 @@ function PieceCard({
             onError={(e) => {
               const target = e.currentTarget;
               target.style.display = 'none';
+              // Show fallback
+              const fallback = target.nextElementSibling as HTMLElement | null;
+              if (fallback) fallback.style.display = 'flex';
             }}
           />
         ) : null}
 
-        {/* Fallback: Color Swatch + Category */}
+        {/* Fallback: Color Swatch + Emoji */}
         <div
           className="absolute inset-0 flex items-center justify-center text-2xl"
           style={{
@@ -549,19 +577,7 @@ function PieceCard({
             display: piece.imageUrl ? 'none' : 'flex',
           }}
         >
-          <span>
-            {(piece.category || '').toLowerCase().includes('shoe') || (piece.category || '').toLowerCase().includes('boot') || (piece.category || '').toLowerCase().includes('sandal')
-              ? '👟'
-              : (piece.category || '').toLowerCase().includes('bag')
-                ? '👜'
-                : (piece.category || '').toLowerCase().includes('jewelry')
-                  ? '✨'
-                  : (piece.category || '').toLowerCase().includes('accessor')
-                    ? '🕶️'
-                    : (piece.category || '').toLowerCase().includes('outerwear') || (piece.category || '').toLowerCase().includes('layer')
-                      ? '🧥'
-                      : '👕'}
-          </span>
+          <span>{config?.emoji || '👕'}</span>
         </div>
 
         {/* Owned Checkbox */}

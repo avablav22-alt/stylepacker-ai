@@ -114,6 +114,75 @@ interface TextContent {
 
 type ContentBlock = TextContent | ImageContent;
 
+// ─── Real Retailer URL Generator ───
+// Maps brand names to actual working retailer search URLs
+const BRAND_SEARCH_URLS: Record<string, (query: string) => string> = {
+  // $ tier — link to brand sites or ASOS
+  'zara': (q) => `https://www.zara.com/us/en/search?searchTerm=${encodeURIComponent(q)}`,
+  'h&m': (q) => `https://www2.hm.com/en_us/search-results.html?q=${encodeURIComponent(q)}`,
+  'asos': (q) => `https://www.asos.com/us/search/?q=${encodeURIComponent(q)}`,
+  'mango': (q) => `https://shop.mango.com/us/search?kw=${encodeURIComponent(q)}`,
+  'uniqlo': (q) => `https://www.uniqlo.com/us/en/search?q=${encodeURIComponent(q)}`,
+  '& other stories': (q) => `https://www.stories.com/en/search.html?q=${encodeURIComponent(q)}`,
+  'topshop': (q) => `https://www.asos.com/us/search/?q=${encodeURIComponent('Topshop ' + q)}`,
+  'urban outfitters': (q) => `https://www.urbanoutfitters.com/search?q=${encodeURIComponent(q)}`,
+  'abercrombie': (q) => `https://www.abercrombie.com/shop/us/search?searchTerm=${encodeURIComponent(q)}`,
+  'cos': (q) => `https://www.cos.com/en_usd/search.html?q=${encodeURIComponent(q)}`,
+  'arket': (q) => `https://www.arket.com/en/search.html?q=${encodeURIComponent(q)}`,
+  'pull&bear': (q) => `https://www.pullandbear.com/us/search?searchTerm=${encodeURIComponent(q)}`,
+  'stradivarius': (q) => `https://www.stradivarius.com/us/search?searchTerm=${encodeURIComponent(q)}`,
+  // $$ tier — link to Nordstrom or Revolve with brand name
+  'reformation': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('Reformation ' + q)}`,
+  'sézane': (q) => `https://www.sezane.com/us/search?q=${encodeURIComponent(q)}`,
+  'reiss': (q) => `https://www.reiss.com/us/search?q=${encodeURIComponent(q)}`,
+  'allsaints': (q) => `https://www.allsaints.com/us/search?q=${encodeURIComponent(q)}`,
+  'massimo dutti': (q) => `https://www.massimodutti.com/us/search?searchTerm=${encodeURIComponent(q)}`,
+  'ba&sh': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('ba&sh ' + q)}`,
+  'rouje': (q) => `https://www.rouje.com/en/search?q=${encodeURIComponent(q)}`,
+  'ganni': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('Ganni ' + q)}`,
+  'staud': (q) => `https://www.revolve.com/r/search.jsp?query=${encodeURIComponent('STAUD ' + q)}`,
+  'cult gaia': (q) => `https://www.revolve.com/r/search.jsp?query=${encodeURIComponent('Cult Gaia ' + q)}`,
+  'anine bing': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('Anine Bing ' + q)}`,
+  'vince': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('Vince ' + q)}`,
+  'theory': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('Theory ' + q)}`,
+  'club monaco': (q) => `https://www.nordstrom.com/sr?keyword=${encodeURIComponent('Club Monaco ' + q)}`,
+  'j.crew': (q) => `https://www.jcrew.com/r/search/?N=0&Nloc=en&Ntrm=${encodeURIComponent(q)}`,
+  'aritzia': (q) => `https://www.aritzia.com/us/en/search?q=${encodeURIComponent(q)}`,
+  // $$$ tier — link to Net-a-Porter, Ssense, or Mytheresa
+  'the row': (q) => `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent('The Row ' + q)}`,
+  'totême': (q) => `https://www.ssense.com/en-us/women/search?q=${encodeURIComponent('Toteme ' + q)}`,
+  'khaite': (q) => `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent('Khaite ' + q)}`,
+  'jacquemus': (q) => `https://www.ssense.com/en-us/women/search?q=${encodeURIComponent('Jacquemus ' + q)}`,
+  'isabel marant': (q) => `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent('Isabel Marant ' + q)}`,
+  'zimmermann': (q) => `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent('Zimmermann ' + q)}`,
+  'ulla johnson': (q) => `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent('Ulla Johnson ' + q)}`,
+  'nanushka': (q) => `https://www.ssense.com/en-us/women/search?q=${encodeURIComponent('Nanushka ' + q)}`,
+  'by far': (q) => `https://www.ssense.com/en-us/women/search?q=${encodeURIComponent('By Far ' + q)}`,
+  'max mara': (q) => `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent('Max Mara ' + q)}`,
+  'brunello cucinelli': (q) => `https://www.mytheresa.com/us-en/catalogsearch/result/?q=${encodeURIComponent('Brunello Cucinelli ' + q)}`,
+  'acne studios': (q) => `https://www.ssense.com/en-us/women/search?q=${encodeURIComponent('Acne Studios ' + q)}`,
+  'bottega veneta': (q) => `https://www.mytheresa.com/us-en/catalogsearch/result/?q=${encodeURIComponent('Bottega Veneta ' + q)}`,
+};
+
+function getShopUrl(brand: string, itemName: string, budgetTier: string): string {
+  const key = brand.toLowerCase();
+  const searchQuery = itemName.replace(/[^\w\s]/g, '').trim();
+
+  // Check for exact brand match
+  if (BRAND_SEARCH_URLS[key]) {
+    return BRAND_SEARCH_URLS[key](searchQuery);
+  }
+
+  // Fallback: use tier-appropriate multi-brand retailer
+  if (budgetTier === '$$$') {
+    return `https://www.net-a-porter.com/en-us/shop/search/${encodeURIComponent(brand + ' ' + searchQuery)}`;
+  }
+  if (budgetTier === '$$') {
+    return `https://www.nordstrom.com/sr?keyword=${encodeURIComponent(brand + ' ' + searchQuery)}`;
+  }
+  return `https://www.asos.com/us/search/?q=${encodeURIComponent(brand + ' ' + searchQuery)}`;
+}
+
 // Mock response for demo mode when API key is missing
 const generateMockCapsule = (
   destination: string,
@@ -143,36 +212,44 @@ const generateMockCapsule = (
   }[] = [];
 
   if (itinerary) {
-    // Try multiple parsing strategies:
-    // 1. Split by "Day X:" / "Day X -" pattern
-    // 2. Split by newlines if no day markers found
-    // 3. Split by numbered lines (1. / 1) / 1:)
+    // Try multiple parsing strategies in order of specificity:
+    // 1. Split by "Day X:" / "Day X -" pattern (most specific)
+    // 2. Split by numbered lines "1." / "1)" / "1:"
+    // 3. Split by newlines (each line = one day)
+    // 4. Single blob of text = one day
 
     let rawDayTexts: string[] = [];
 
-    // Strategy 1: "Day 1:", "Day 1 -", "Day 1 –"
-    const dayMarkerSplit = itinerary.split(/day\s*\d+\s*[:\-–]/i);
-    const dayMarkerTexts = dayMarkerSplit.filter(d => d.trim());
+    // Strategy 1: Check if text contains "Day 1:", "Day 2 -", etc.
+    const hasDayMarkers = /day\s*\d+\s*[:\-–]/i.test(itinerary);
+    if (hasDayMarkers) {
+      const dayMarkerSplit = itinerary.split(/day\s*\d+\s*[:\-–]/i);
+      rawDayTexts = dayMarkerSplit.filter(d => d.trim());
+    }
 
-    if (dayMarkerTexts.length > 0) {
-      rawDayTexts = dayMarkerTexts;
-    } else {
-      // Strategy 2: Numbered lines "1.", "1)", "1:"
-      const numberedSplit = itinerary.split(/(?:^|\n)\s*\d+\s*[.):\-]/);
-      const numberedTexts = numberedSplit.filter(d => d.trim());
-
-      if (numberedTexts.length > 1) {
-        rawDayTexts = numberedTexts;
-      } else {
-        // Strategy 3: Split by newlines
-        const lineSplit = itinerary.split(/\n+/).filter(l => l.trim());
-        if (lineSplit.length > 0) {
-          rawDayTexts = lineSplit;
-        } else {
-          // Single blob of text — treat as one day
-          rawDayTexts = [itinerary.trim()];
+    // Strategy 2: Numbered lines "1.", "1)", "1:"
+    if (rawDayTexts.length <= 1) {
+      const hasNumberedLines = /(?:^|\n)\s*\d+\s*[.):\-]/.test(itinerary);
+      if (hasNumberedLines) {
+        const numberedSplit = itinerary.split(/(?:^|\n)\s*\d+\s*[.):\-]/);
+        const numberedTexts = numberedSplit.filter(d => d.trim());
+        if (numberedTexts.length > 1) {
+          rawDayTexts = numberedTexts;
         }
       }
+    }
+
+    // Strategy 3: Split by newlines — each line is one day
+    if (rawDayTexts.length <= 1) {
+      const lineSplit = itinerary.split(/\n+/).filter(l => l.trim());
+      if (lineSplit.length > 1) {
+        rawDayTexts = lineSplit;
+      }
+    }
+
+    // Strategy 4: Single blob of text = one day
+    if (rawDayTexts.length === 0) {
+      rawDayTexts = [itinerary.trim()];
     }
 
     rawDayTexts.forEach((dayText) => {
@@ -279,7 +356,7 @@ const generateMockCapsule = (
             colorHex: '#1A1A1A',
             category: 'outerwear',
             material: '65% Viscose, 35% Silk',
-            shopUrl: `https://www.${brands[0].toLowerCase().replace(/\s+/g, '')}.com/search?q=silk+blend+blazer`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Silk Blend Blazer', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('silk blend blazer black')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -294,7 +371,7 @@ const generateMockCapsule = (
             colorHex: '#36454F',
             category: 'bottoms',
             material: '100% Wool',
-            shopUrl: `https://www.${brands[1].toLowerCase().replace(/\s+/g, '')}.com/search?q=tailored+trousers`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Wide-Leg Tailored Trousers', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('wool tailored trousers charcoal')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -309,7 +386,7 @@ const generateMockCapsule = (
             colorHex: '#FFD700',
             category: 'jewelry',
             material: '18k Gold Plated',
-            shopUrl: `https://www.${brands[2].toLowerCase().replace(/\s+/g, '')}.com/search?q=gold+hoop+earrings`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Minimal Gold Hoop Earrings', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('gold hoop earrings minimal')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -324,7 +401,7 @@ const generateMockCapsule = (
             colorHex: '#000000',
             category: 'shoes',
             material: '100% Leather',
-            shopUrl: `https://www.${brands[3].toLowerCase().replace(/\s+/g, '')}.com/search?q=pointed+toe+pumps`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Pointed-Toe Leather Pumps', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('leather pumps pointed toe black')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -345,7 +422,7 @@ const generateMockCapsule = (
             colorHex: '#F5F5DC',
             category: 'tops',
             material: '100% Linen',
-            shopUrl: `https://www.${brands[0].toLowerCase().replace(/\s+/g, '')}.com/search?q=linen+shirt`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Lightweight Linen Shirt', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('lightweight linen shirt off-white')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -360,7 +437,7 @@ const generateMockCapsule = (
             colorHex: '#C19A6B',
             category: 'bottoms',
             material: 'Cotton-Linen Blend',
-            shopUrl: `https://www.${brands[1].toLowerCase().replace(/\s+/g, '')}.com/search?q=chino+pants`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Tailored Chino Pants', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('tailored chino pants camel')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -375,7 +452,7 @@ const generateMockCapsule = (
             colorHex: '#8B4513',
             category: 'bags',
             material: 'Full-Grain Leather',
-            shopUrl: `https://www.${brands[2].toLowerCase().replace(/\s+/g, '')}.com/search?q=leather+crossbody`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Leather Crossbody Bag', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('leather crossbody bag cognac')}`,
             isReused: true,
             reusedDays: [dayNum, dayNum + 1],
@@ -390,7 +467,7 @@ const generateMockCapsule = (
             colorHex: '#D2B48C',
             category: 'shoes',
             material: 'Italian Suede',
-            shopUrl: `https://www.${brands[3].toLowerCase().replace(/\s+/g, '')}.com/search?q=suede+loafers`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Suede Slip-On Loafers', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('suede slip-on loafers tan')}`,
             isReused: false,
             reusedDays: [dayNum],
@@ -405,7 +482,7 @@ const generateMockCapsule = (
             colorHex: '#000000',
             category: 'accessories',
             material: 'Acetate Frame',
-            shopUrl: `https://www.${brands[4].toLowerCase().replace(/\s+/g, '')}.com/search?q=oversized+sunglasses`,
+            shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Oversized Sunglasses', budgetTier),
             imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('oversized sunglasses black')}`,
             isReused: true,
             reusedDays: [dayNum, dayNum + 1, dayNum + 2],
@@ -427,7 +504,7 @@ const generateMockCapsule = (
           colorHex: isEvening ? '#FFFFFF' : '#001F3F',
           category: isEvening ? 'dresses' : 'layers',
           material: isEvening ? '100% Linen' : 'Polyester/Nylon',
-          shopUrl: `https://www.${brands[0].toLowerCase().replace(/\s+/g, '')}.com/search?q=${isEvening ? 'linen+dress' : 'swimsuit'}`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], isEvening ? 'Linen Cover-Up Dress' : 'Classic Swimsuit', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(isEvening ? 'linen cover-up white' : 'navy swimsuit')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -442,7 +519,7 @@ const generateMockCapsule = (
           colorHex: '#D2B48C',
           category: 'shoes',
           material: isEvening ? 'Leather' : 'Rubber',
-          shopUrl: `https://www.${brands[1].toLowerCase().replace(/\s+/g, '')}.com/search?q=${isEvening ? 'sandals' : 'flip+flops'}`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], isEvening ? 'Woven Leather Sandals' : 'Flip Flops', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(isEvening ? 'woven leather sandals' : 'flip flops')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -457,7 +534,7 @@ const generateMockCapsule = (
           colorHex: '#FFFFFF',
           category: 'bags',
           material: '100% Canvas',
-          shopUrl: `https://www.${brands[2].toLowerCase().replace(/\s+/g, '')}.com/search?q=canvas+tote`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Canvas Tote Bag', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('canvas tote bag white')}`,
           isReused: true,
           reusedDays: [dayNum, dayNum + 1],
@@ -478,7 +555,7 @@ const generateMockCapsule = (
           colorHex: '#8B0000',
           category: 'dresses',
           material: '100% Satin',
-          shopUrl: `https://www.${brands[0].toLowerCase().replace(/\s+/g, '')}.com/search?q=satin+slip+dress`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Satin Slip Dress', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('satin slip dress red')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -493,7 +570,7 @@ const generateMockCapsule = (
           colorHex: '#C0C0C0',
           category: 'shoes',
           material: 'Satin and Leather',
-          shopUrl: `https://www.${brands[1].toLowerCase().replace(/\s+/g, '')}.com/search?q=heeled+sandals`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Metallic Heeled Sandals', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('metallic heeled sandals silver')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -508,7 +585,7 @@ const generateMockCapsule = (
           colorHex: '#FFD700',
           category: 'jewelry',
           material: 'Gold Plated',
-          shopUrl: `https://www.${brands[2].toLowerCase().replace(/\s+/g, '')}.com/search?q=pendant+necklace`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Layered Pendant Necklace', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('layered pendant necklace gold')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -523,7 +600,7 @@ const generateMockCapsule = (
           colorHex: '#000000',
           category: 'bags',
           material: 'Satin',
-          shopUrl: `https://www.${brands[3].toLowerCase().replace(/\s+/g, '')}.com/search?q=evening+clutch`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Structured Evening Clutch', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('structured evening clutch black')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -545,7 +622,7 @@ const generateMockCapsule = (
           colorHex: isEvening ? '#FFFDD0' : '#FFFFFF',
           category: 'tops',
           material: isEvening ? 'Silk blend' : '100% Cotton',
-          shopUrl: `https://www.${brands[0].toLowerCase().replace(/\s+/g, '')}.com/search?q=${isEvening ? 'blouse' : 'tee'}`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], isEvening ? 'Silk Blend Blouse' : 'Classic Crewneck Tee', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(isEvening ? 'silk blouse cream' : 'crewneck tee')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -560,7 +637,7 @@ const generateMockCapsule = (
           colorHex: isEvening ? '#D4C5A9' : '#4169E1',
           category: 'bottoms',
           material: isEvening ? '100% Linen' : 'Cotton-Elastane',
-          shopUrl: `https://www.${brands[1].toLowerCase().replace(/\s+/g, '')}.com/search?q=${isEvening ? 'linen+trousers' : 'jeans'}`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], isEvening ? 'Wide-Leg Linen Trousers' : 'Relaxed Denim Jeans', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(isEvening ? 'wide-leg linen trousers' : 'denim jeans')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -575,7 +652,7 @@ const generateMockCapsule = (
           colorHex: isEvening ? '#D2B48C' : '#FFFFFF',
           category: 'shoes',
           material: isEvening ? 'Leather' : 'Canvas',
-          shopUrl: `https://www.${brands[2].toLowerCase().replace(/\s+/g, '')}.com/search?q=${isEvening ? 'sandals' : 'sneakers'}`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], isEvening ? 'Leather Strap Sandals' : 'White Canvas Sneakers', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(isEvening ? 'leather sandals tan' : 'canvas sneakers')}`,
           isReused: false,
           reusedDays: [dayNum],
@@ -590,7 +667,7 @@ const generateMockCapsule = (
           colorHex: '#8B4513',
           category: 'bags',
           material: 'Vegan Leather',
-          shopUrl: `https://www.${brands[3].toLowerCase().replace(/\s+/g, '')}.com/search?q=crossbody+bag`,
+          shopUrl: getShopUrl(brands[Math.floor(Math.random() * brands.length)], 'Structured Crossbody Bag', budgetTier),
           imageUrl: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent('structured crossbody bag')}`,
           isReused: true,
           reusedDays: [dayNum, dayNum + 1, dayNum + 2],
